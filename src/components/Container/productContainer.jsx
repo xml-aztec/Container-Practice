@@ -1,77 +1,83 @@
 import React, { useState, useEffect } from "react";
+import { useCart } from "../Context/CartContext";
+import ProductList from "../Presentational/ProductList";
 
 const ProductContainer = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filteredProducts, setFilteredProducts] = useState([]);
-  const [activeCategory, setActiveCategory] = useState(null);
+  const [activeCategory, setActiveCategory] = useState("all");
+  const { cart, dispatch } = useCart();
 
   useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch("https://fakestoreapi.com/products");
+        const data = await response.json();
+        setProducts(data);
+        setFilteredProducts(data);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchProducts();
   }, []);
 
-  const fetchProducts = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("https://fakestoreapi.com/products");
-      const data = await response.json();
-      setProducts(data);
-      setFilteredProducts(data);
-    } catch (error) {
-      console.error("Error fetching products:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFilter = (category) => {
-    setActiveCategory(category);
-    if (category === "All") {
+  useEffect(() => {
+    if (activeCategory === "all") {
       setFilteredProducts(products);
     } else {
       setFilteredProducts(
-        products.filter((product) => product.category === category)
+        products.filter((product) => product.category === activeCategory)
       );
     }
+  }, [activeCategory, products]);
+
+  const handleAddToCart = (product) => {
+    dispatch({ type: "ADD_ITEM", payload: product });
   };
+
+  const getCartQuantity = (productId) => {
+    const item = cart.find((item) => item.id === productId);
+    return item?.quantity || 0;
+  };
+
+  const categories = [
+    "all",
+    "men's clothing",
+    "women's clothing",
+    "electronics",
+    "jewelery",
+  ];
 
   return (
     <div className="product-container">
       <div className="filter-buttons">
-        {["men's clothing", "women's clothing", "electronics", "jewelery"].map(
-          (cat) => (
-            <button
-              key={cat}
-              className={`filter-button ${
-                activeCategory === cat ? "active" : ""
-              }`}
-              onClick={() => handleFilter(cat)}
-            >
-              {cat.charAt(0).toUpperCase() + cat.slice(1)}
-            </button>
-          )
-        )}
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            className={`filter-button ${
+              activeCategory === cat ? "active" : ""
+            }`}
+            onClick={() => setActiveCategory(cat)}
+          >
+            {cat === "all" ? "All" : cat.replace(/'/g, "’")}
+          </button>
+        ))}
       </div>
+
       {loading ? (
         <div className="spinner"></div>
       ) : (
-        <div className="product-list">
-          {filteredProducts.map((product) => (
-            <div key={product.id} className="product-card">
-              <img
-                src={product.image}
-                alt={product.title}
-                className="product-image"
-              />
-              <p className="product-category">
-                {product.category.charAt(0).toUpperCase() +
-                  product.category.slice(1)}
-              </p>
-              <p className="product-title">{product.title}</p>
-              <p className="product-price">${product.price.toFixed(2)}</p>
-            </div>
-          ))}
-        </div>
+        <ProductList
+          products={filteredProducts}
+          onAddToCart={handleAddToCart}
+          getCartQuantity={getCartQuantity}
+          dispatch={dispatch}
+        />
       )}
     </div>
   );
